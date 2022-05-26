@@ -61,10 +61,10 @@ import java_cup.runtime.Symbol;
 	break;
 		case COMMENT:
 			yybegin(YYINITIAL);
-          		return new Symbol(TokenConstants.ERROR, "Found an EOF in the comment");
+          		return new Symbol(TokenConstants.ERROR, "EOF in comment");
 		case STRING:
 			yybegin(YYINITIAL);
-			return new Symbol(TokenConstants.ERROR, "Found an EOF in the string");
+			return new Symbol(TokenConstants.ERROR, "EOF in string constant");
 
     }
     return new Symbol(TokenConstants.EOF);
@@ -79,11 +79,14 @@ import java_cup.runtime.Symbol;
 
 CLASS = [Cc][Ll][Aa][Ss][Ss]
 ELSE = [Ee][Ll][Ss][Ee]
+
 IF = [Ii][Ff]
 FI = [Ff][Ii]
 IN = [Ii][Nn]
+
 INHERITS = [Ii][Nn][Hh][Ee][Rr][Ii][Tt][Ss]
 ISVOID = [Ii][Ss][Vv][Oo][Ii][Dd]
+
 LET = [Ll][Ee][Tt]
 LOOP = [Ll][Oo][Oo][Pp]
 POOL = [Pp][Oo][Oo][Ll]
@@ -91,23 +94,23 @@ THEN = [Tt][Hh][Ee][Nn]
 WHILE = [Ww][Hh][Ii][Ll][Ee]
 CASE = [Cc][Aa][Ss][Ee]
 ESAC = [Ee][Ss][Aa][Cc]
+
 NEW = [Nn][Ee][Ww]
 OF = [Oo][Ff]
 NOT = [Nn][Oo][Tt]
 TRUE = t[Rr][Uu][Ee]
 FALSE = f[Aa][Ll][Ss][Ee]
+
 DIGIT = [0-9]
-TYPE_IDENT = [A-Z][A-Za-z0-9_]*
-OBJ_IDENT = [a-z][A-Za-z0-9_]*
+OBJ_ID = [a-z][A-Za-z0-9_]*
 CHAR = .|\r
 STRING_START = \"
 STRING_CHAR  = [^\"\0\n\\]+
 STRING_END = \"
 COMMENT_LINE = --[^\n]*
-COMMENT_TXT_START = \(\*
-COMMENT_TXT_END = \*\)
+
 BLANK_SPACE = [ \t\r\f\32]
-NEWLINE = \n
+NEWLINE = [\n]
 SOMA = "+"
 SUBTRACT = "-"
 MULTIPLY = "*"
@@ -133,23 +136,37 @@ ARROW = "=>"
 
 %%
 
-<COMMENT,YYINITIAL>{COMMENT_TXT_START}  {
-			yybegin(COMMENT);
-			commentLength++;
+
+<YYINITIAL> "(*" {
+    yybegin(COMMENT);
+    commentLength++;
 }
-<COMMENT>{COMMENT_TXT_END}              {
-			commentLength--;
-			if(commentLength == 0) {
-				 yybegin(YYINITIAL);
-			}
+
+<COMMENT> "(*" {
+    commentLength++;
 }
-<YYINITIAL>{COMMENT_TXT_END}        { return new Symbol(TokenConstants.ERROR, "Closing character not found"); }
+
+<COMMENT> "*)" {
+    if(--commentLength == 0) {
+        yybegin(YYINITIAL);
+    }
+}
+
+<COMMENT> {NEWLINE} {}
+<COMMENT> . {}
+
+<YYINITIAL> "*)" {
+    return new Symbol(TokenConstants.ERROR, "Unmatched *)");
+}
+
 <YYINITIAL>{COMMENT_LINE}         { ; }
 <COMMENT>{CHAR}                   { ; }
 <YYINITIAL>{BLANK_SPACE}            { ; }
 
-<YYINITIAL>{TYPE_IDENT}               { return new Symbol(TokenConstants.TYPEID, new IdSymbol(yytext(), yytext().length(), yytext().hashCode())); }
-<YYINITIAL>{OBJ_IDENT}                { return new Symbol(TokenConstants.OBJECTID, new IdSymbol(yytext(), yytext().length(), yytext().hashCode())); }
+<YYINITIAL>{OBJ_ID} {
+    if (Character.isLowerCase(yytext().charAt(0))) return new Symbol(TokenConstants.OBJECTID, new IdSymbol(yytext(), yytext().length(), yytext().hashCode()));
+    return new Symbol(TokenConstants.TYPEID, new IdSymbol(yytext(), yytext().length(), yytext().hashCode()));
+}
 
 <YYINITIAL>{ELSE}                    { return new Symbol(TokenConstants.ELSE); }
 <YYINITIAL>{IF}                      { return new Symbol(TokenConstants.IF); }
@@ -201,7 +218,7 @@ ARROW = "=>"
 
 <STRING>\x00                       {
 		yybegin(STRING_ERROR_NULL);
-		return new Symbol(TokenConstants.ERROR, "A null character was found in the string");
+		return new Symbol(TokenConstants.ERROR, "String contains null character");
 }
 <STRING>\\b                        { string_buf.append("\b"); }
 <STRING>\\f                        { string_buf.append("\f"); }
@@ -217,7 +234,7 @@ ARROW = "=>"
 <STRING>\n                         {
 		string_buf.setLength(0);
                 yybegin(YYINITIAL);
-                return new Symbol(TokenConstants.ERROR, "The string was not closed");
+                return new Symbol(TokenConstants.ERROR, "Unterminated string constant");
 }
 
 <STRING>{STRING_END}               {
@@ -225,20 +242,17 @@ ARROW = "=>"
                 String s = string_buf.toString();
 
 		if(s.length() >= MAX_STR_CONST) {
-                	return new Symbol(TokenConstants.ERROR, "String too long");
+                	return new Symbol(TokenConstants.ERROR, "String constant too long");
                 } else {
                 	return new Symbol(TokenConstants.STR_CONST, new StringSymbol(s, s.length(), s.hashCode()));
                 }
 }
 
 
+<STRING_ERROR_NULL> {NEWLINE}           { yybegin(YYINITIAL); }
 <STRING_ERROR_NULL>\n               { yybegin(YYINITIAL); }
 <STRING_ERROR_NULL>\"               { yybegin(YYINITIAL); }
 <STRING_ERROR_NULL>.                { ; }
-\n                               { curr_lineno++; }
+\n                                  { curr_lineno++; }
 
-.                               { /* This rule should be the very last
-                                     in your lexical specification and
-                                     will match match everything not
-                                     matched by other lexical rules. */
-                                  return new Symbol(TokenConstants.ERROR, "Unknown character: " + yytext()); }
+.                               { return new Symbol(TokenConstants.ERROR, yytext()); }

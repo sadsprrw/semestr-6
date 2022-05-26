@@ -1,5 +1,6 @@
 from matplotlib import pyplot as plt, patches
 
+
 class Node:
     def __init__(self, lx, rx, left_son, right_son):
         self.lx = lx
