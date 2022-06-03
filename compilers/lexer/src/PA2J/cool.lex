@@ -250,9 +250,7 @@ ARROW = "=>"
 
 
 <STRING_ERROR_NULL> {NEWLINE}           { yybegin(YYINITIAL); }
-<STRING_ERROR_NULL>\n               { yybegin(YYINITIAL); }
 <STRING_ERROR_NULL>\"               { yybegin(YYINITIAL); }
 <STRING_ERROR_NULL>.                { ; }
 \n                                  { curr_lineno++; }
-
 .                               { return new Symbol(TokenConstants.ERROR, yytext()); }
