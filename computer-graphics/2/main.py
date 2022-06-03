@@ -264,7 +264,7 @@ class Voronoy:
 
 
 def init():
-    N = 7
+    N = 6
     points = []
 
     for i in range(N):
